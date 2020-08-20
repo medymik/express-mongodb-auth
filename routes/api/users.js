@@ -66,4 +66,66 @@ router.post('/', [
 
 });
 
+/**
+ * @Route /api/users/auth
+ * @method POST
+ * @desc User Login
+ */
+router.post('/auth', [
+    // You can add a custom message
+    // e.g. check('name', 'Please enter a valid name')
+    check('email').isEmail(),
+    check('password').isLength({ min: 6 })
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        // Bad Request
+        return res.status(400).json(errors);
+    }
+    const { email, password } = req.body;
+
+    try {
+        // check if the email exists
+        let user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({
+                errors: [
+                    {
+                        msg: 'Invalid Credentials'
+                    }
+                ]
+            });
+        }
+
+        // Check if the password correct
+        const verify = await bcrypt.compare(password, user.password);
+        if (!verify) {
+            return res.status(400).json({
+                errors: [
+                    {
+                        msg: 'Invalid Credentials'
+                    }
+                ]
+            });
+        }
+
+        // Generate JWT token with sign for 1h
+        const payload = {
+            user: {
+                name: user.name,
+                email: user.email
+            }
+        };
+        const token = jwt.sign(payload, process.env.SECRET, { expiresIn: '1h' });
+        return res.status(201).json({
+            token: token
+        });
+
+    } catch (error) {
+        console.log(error.message);
+        res.status(500).send('Server Error');
+    }
+
+});
+
 module.exports = router;
